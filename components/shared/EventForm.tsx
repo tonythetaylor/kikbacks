@@ -24,6 +24,9 @@ import Image from "next/image";
 import DatePicker from "react-datepicker";
 
 import "react-datepicker/dist/react-datepicker.css";
+import { useUploadThing } from "@/lib/uploadthing";
+import { useRouter } from "next/navigation";
+import { createEvent, updateEvent } from "@/lib/actions/event.actions"
 
 type EventFormProps = {
   userId: string;
@@ -33,13 +36,45 @@ type EventFormProps = {
 const EventForm = ({ userId, type }: EventFormProps) => {
   const [files, setFiles] = useState<File[]>([]);
   const initialValues = eventDefaultValues;
+
+  const { startUpload } = useUploadThing('imageUploader')
+ const router = useRouter()
   const form = useForm<z.infer<typeof eventFormSchema>>({
     resolver: zodResolver(eventFormSchema),
     defaultValues: initialValues,
   });
 
-  function onSubmit(values: z.infer<typeof eventFormSchema>) {
-    console.log(values);
+  async function onSubmit(values: z.infer<typeof eventFormSchema>) {
+    const eventData = values;
+
+    let uploadImageUrl = values.imageUrl;
+
+    if (files.length > 0) {
+      const uploadImages = await startUpload(files)
+
+      if(!uploadImages) {
+        return
+      }
+      uploadImageUrl = uploadImages[0].url
+    }
+
+    if (type === 'Create') {
+      try {
+        const newEvent = await createEvent({
+          event: {...values, imageUrl: uploadImageUrl },
+          userId,
+          path: '/profile'
+        })
+
+        if(newEvent) { 
+          form.reset();
+          router.push(`/events/${newEvent._id}`)
+        }
+
+      } catch (error) {
+        console.log(error)
+      }
+    }
   }
   return (
     <Form {...form}>
